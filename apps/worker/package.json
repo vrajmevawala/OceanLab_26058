@@ -1,0 +1,29 @@
+{
+  "name": "@codeopt/worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.60.0",
+    "@codeopt/db": "workspace:*",
+    "bullmq": "^5.48.0",
+    "dotenv": "^16.4.5",
+    "drizzle-orm": "^0.37.0",
+    "groq-sdk": "^1.1.2",
+    "ioredis": "^5.3.2",
+    "tree-sitter": "^0.22.4",
+    "tree-sitter-python": "^0.23.2",
+    "tree-sitter-cpp": "^0.23.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.24",
+    "tsx": "^4.7.1",
+    "typescript": "^5.3.3"
+  }
+}
