@@ -18,10 +18,10 @@ process.on('SIGINT', async () => {
 });
 
 import { createServer } from 'http';
-const port = process.env.PORT || 3002;
+const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3002;
 createServer((_req, res) => {
   res.writeHead(200);
-  res.end('Worker is active\\n');
-}).listen(port, () => {
-  console.log(`Worker dummy server listening on port ${port}`);
+  res.end('Worker is active\n');
+}).listen(port, '0.0.0.0', () => {
+  console.log(`Worker dummy server listening on 0.0.0.0:${port}`);
 });
