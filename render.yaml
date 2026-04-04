@@ -3,7 +3,7 @@ services:
     name: codesage-api
     env: node
     rootDir: .
-    buildCommand: pnpm install && pnpm build
+    buildCommand: pnpm install && npx turbo build --filter=@codeopt/api...
     startCommand: cd apps/api && pnpm start
     envVars:
       - key: NODE_ENV
@@ -23,7 +23,7 @@ services:
     name: codesage-web
     env: node
     rootDir: .
-    buildCommand: pnpm install && pnpm build
+    buildCommand: pnpm install && npx turbo build --filter=codesage...
     startCommand: cd apps/web && pnpm start
     envVars:
       - key: NODE_ENV
@@ -38,7 +38,7 @@ services:
     name: codesage-worker
     env: node
     rootDir: .
-    buildCommand: pnpm install && pnpm build
+    buildCommand: pnpm install && npx turbo build --filter=@codeopt/worker...
     startCommand: cd apps/worker && pnpm start
     envVars:
       - key: NODE_ENV
