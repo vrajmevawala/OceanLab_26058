@@ -21,43 +21,6 @@ const groq = new Groq({ apiKey: process.env.GROQ_API_KEY ?? '' });
 const SCORE_THRESHOLD = 50;
 const MAX_FILES_PER_PR = 10;
 
-// ---------- Truncation config ----------
-// Groq free tier: 100k tokens/day. Each file costs roughly:
-//   (content chars / 4) + ~500 tokens for system/user prompt overhead.
-// Capping content at 6000 chars keeps each file under ~2000 tokens,
-// giving us room for ~45-50 files/day on the free tier.
-const MAX_FILE_CHARS = 6000;
-
-function truncateContent(content: string, filename: string): string {
-  if (content.length <= MAX_FILE_CHARS) return content;
-
-  // Try to truncate at a clean line boundary
-  const sliced = content.slice(0, MAX_FILE_CHARS);
-  const lastNewline = sliced.lastIndexOf('\n');
-  const truncated = lastNewline > MAX_FILE_CHARS * 0.8
-    ? sliced.slice(0, lastNewline)
-    : sliced;
-
-  const linesKept = truncated.split('\n').length;
-  const totalLines = content.split('\n').length;
-
-  console.log(
-    `[Truncate] ${filename}: ${content.length} chars → ${truncated.length} chars` +
-    ` (${linesKept}/${totalLines} lines kept)`,
-  );
-
-  return (
-    truncated +
-    `\n\n// ── TRUNCATED ──────────────────────────────────────────────────────\n` +
-    `// File is ${content.length} chars. Only the first ${truncated.length} chars\n` +
-    `// (${linesKept} of ${totalLines} lines) were sent for analysis to stay within\n` +
-    `// the Groq free-tier token budget. The remainder was not analysed.\n` +
-    `// ────────────────────────────────────────────────────────────────────`
-  );
-}
-
-// ---------- Tool definitions ----------
-
 const REPORT_ISSUE_TOOL = {
   type: 'function' as const,
   function: {
@@ -115,7 +78,7 @@ function verifyWebhookSignature(payload: string, signature: string | undefined):
   }
 }
 
-// ---------- Types ----------
+// ---------- Analyze a single file ----------
 
 interface FileIssue {
   file: string;
@@ -139,28 +102,20 @@ interface ScoreBreakdown {
   total: number;
 }
 
-// ---------- Analyze a single file ----------
-
-async function analyzeFile(filename: string, rawContent: string): Promise<{
+async function analyzeFile(filename: string, content: string): Promise<{
   issues: FileIssue[];
   score: number;
   scoreBreakdown: ScoreBreakdown | null;
   cyclomaticComplexity: number | null;
   cognitiveComplexity: number | null;
-  wasTruncated: boolean;
 }> {
   const language = detectLanguage(filename);
 
-  // ── Truncate before touching the API ────────────────────────────────────
-  const wasTruncated = rawContent.length > MAX_FILE_CHARS;
-  const content = truncateContent(rawContent, filename);
-  // ────────────────────────────────────────────────────────────────────────
-
-  // 1. AST Analysis (run on full content so metrics stay accurate)
-  const astMetrics = await getTreeSitterAnalysis(rawContent, language);
+  // 1. AST Analysis
+  const astMetrics = await getTreeSitterAnalysis(content, language);
   const astContext = astMetrics ? buildASTContext(astMetrics) : undefined;
 
-  // 2. AI Analysis
+  // 2. AI Analysis with BOTH tools
   const response = await groq.chat.completions.create({
     model: 'llama-3.3-70b-versatile',
     messages: [
@@ -192,18 +147,13 @@ async function analyzeFile(filename: string, rawContent: string): Promise<{
   // Extract score
   const scoreCall = toolCalls.find((tc) => tc.function.name === 'score_code');
   let scoreBreakdown: ScoreBreakdown | null = null;
-  let score = 50;
+  let score = 50; // Default if AI doesn't score
 
   if (scoreCall) {
     const s = JSON.parse(scoreCall.function.arguments);
-    const rawTotal =
-      (s.correctness || 0) +
-      (s.performance || 0) +
-      (s.codeQuality || 0) +
-      (s.architecture || 0) +
-      (s.optimization || 0) +
-      (s.productionReadiness || 0);
-    score = Math.max(0, Math.min(100, rawTotal));
+    const rawTotal = (s.correctness || 0) + (s.performance || 0) + (s.codeQuality || 0) +
+      (s.architecture || 0) + (s.optimization || 0) + (s.productionReadiness || 0);
+    score = Math.max(0, Math.min(100, rawTotal)); // Already out of 100
 
     scoreBreakdown = {
       correctness: s.correctness || 0,
@@ -223,7 +173,6 @@ async function analyzeFile(filename: string, rawContent: string): Promise<{
     scoreBreakdown,
     cyclomaticComplexity: astMetrics?.cyclomaticComplexity ?? null,
     cognitiveComplexity: astMetrics?.cognitiveComplexity ?? null,
-    wasTruncated,
   };
 }
 
@@ -236,8 +185,7 @@ function buildPRComment(
     scoreBreakdown: ScoreBreakdown | null;
     issues: FileIssue[];
     cyclomaticComplexity: number | null;
-    cognitiveComplexity: number | null;
-    wasTruncated: boolean;
+    cognitiveComplexity: number | null
   }>,
   overallScore: number,
   passed: boolean,
@@ -248,7 +196,6 @@ function buildPRComment(
   const errors = allIssues.filter((i) => i.severity === 'error').length;
   const warnings = allIssues.filter((i) => i.severity === 'warning').length;
   const infos = allIssues.filter((i) => i.severity === 'info').length;
-  const truncatedFiles = results.filter((r) => r.wasTruncated).length;
 
   let avgCorrectness = 0;
   let avgPerformance = 0;
@@ -279,9 +226,7 @@ function buildPRComment(
     avgProductionReadiness = Math.round(avgProductionReadiness / totalScoreBreakdowns);
   }
 
-  const calculatedTotal =
-    avgCorrectness + avgPerformance + avgCodeQuality +
-    avgArchitecture + avgOptimization + avgProductionReadiness;
+  const calculatedTotal = avgCorrectness + avgPerformance + avgCodeQuality + avgArchitecture + avgOptimization + avgProductionReadiness;
 
   let comment = `## 🔮 CodeSage Analysis — Score: ${overallScore}/100 ${statusIcon}\n\n`;
 
@@ -290,14 +235,7 @@ function buildPRComment(
   comment += `| Files Analyzed | ${results.length} |\n`;
   comment += `| Errors | ${errors} |\n`;
   comment += `| Warnings | ${warnings} |\n`;
-  comment += `| Info | ${infos} |\n`;
-
-  // Show truncation notice in the overview table if any files were cut
-  if (truncatedFiles > 0) {
-    comment += `| ⚠️ Partially analyzed | ${truncatedFiles} file(s) over ${MAX_FILE_CHARS} chars — first ${MAX_FILE_CHARS} chars analyzed |\n`;
-  }
-
-  comment += `\n`;
+  comment += `| Info | ${infos} |\n\n`;
 
   if (totalScoreBreakdowns > 0) {
     comment += `### 📊 Final Score Breakdown\n`;
@@ -318,19 +256,16 @@ function buildPRComment(
   comment += `- **PR scoring system**: ${overallScore >= 80 ? '🟢 Excellent' : overallScore >= 60 ? '🟡 Fair' : '🔴 Poor'} (${overallScore}/100)\n`;
   comment += `- **Repo health score**: 92/100 (Stable)\n\n`;
 
-  if (allIssues.length === 0 && results.every((r) => r.score >= 90)) {
+  if (allIssues.length === 0 && results.every(r => r.score >= 90)) {
     comment += `> ✨ **No issues found!** Great code quality.\n`;
     return comment;
   }
 
-  // Per-file breakdown
+  // Group issues by file
   for (const result of results) {
-    comment += `### 📄 \`${result.file}\` — Score: ${result.score}/100`;
-    if (result.wasTruncated) {
-      comment += ` ⚠️ *(large file — first ${MAX_FILE_CHARS} chars analyzed)*`;
-    }
-    comment += `\n`;
+    comment += `### 📄 \`${result.file}\` — Score: ${result.score}/100\n`;
 
+    // Add Score Breakdown Table
     if (result.scoreBreakdown) {
       const b = result.scoreBreakdown;
       comment += `\n**Code Quality Breakdown:**\n`;
@@ -355,9 +290,7 @@ function buildPRComment(
     }
 
     for (const issue of result.issues) {
-      const icon =
-        issue.severity === 'error' ? '🔴' :
-          issue.severity === 'warning' ? '🟡' : '🔵';
+      const icon = issue.severity === 'error' ? '🔴' : issue.severity === 'warning' ? '🟡' : '🔵';
       comment += `${icon} **Ln ${issue.line}** [${issue.category}]: ${issue.message}\n`;
       if (issue.suggestion) {
         comment += `  > 💡 ${issue.suggestion}\n`;
@@ -383,6 +316,7 @@ function buildDedupeKey(owner: string, repo: string, prNumber: number, sha: stri
   return `${owner}/${repo}#${prNumber}@${sha}`;
 }
 
+// Auto-clean stale entries after 10 minutes
 setInterval(() => {
   processingPRs.clear();
 }, 10 * 60 * 1000);
@@ -400,7 +334,10 @@ async function handlePullRequest(payload: any) {
   const repo = repository.name;
   const prNumber = pr.number;
   const headSha = pr.head.sha;
+  const headOwner = pr.head?.repo?.owner?.login || owner;
+  const headRepo = pr.head?.repo?.name || repo;
 
+  // Deduplicate: skip if we're already processing this exact PR + SHA
   const dedupeKey = buildDedupeKey(owner, repo, prNumber, headSha);
   if (processingPRs.has(dedupeKey)) {
     console.log(`[GitHub] Skipping duplicate PR #${prNumber} on ${owner}/${repo} (sha: ${headSha})`);
@@ -413,7 +350,7 @@ async function handlePullRequest(payload: any) {
   try {
     const octokit = await createInstallationOctokit(installationId);
 
-    // 0. Find existing bot comment for upsert
+    // 0. Find existing bot comment for upsert (prevents duplicate comments across instances)
     const { data: existingComments } = await octokit.rest.issues.listComments({
       owner,
       repo,
@@ -423,12 +360,13 @@ async function handlePullRequest(payload: any) {
     const existingBotComment = existingComments.find(
       (c: any) => c.user?.type === 'Bot' && c.body?.includes('CodeSage Analysis'),
     );
+    // If bot already commented on this EXACT SHA, skip entirely
     if (existingBotComment?.body?.includes(headSha.slice(0, 7))) {
       console.log(`[GitHub] Bot already commented on PR #${prNumber} for sha ${headSha}, skipping`);
       return;
     }
 
-    // 1. Create pending check run
+    // 1. Create a pending check run
     const { data: checkRun } = await octokit.rest.checks.create({
       owner,
       repo,
@@ -438,7 +376,7 @@ async function handlePullRequest(payload: any) {
       started_at: new Date().toISOString(),
     });
 
-    // 2. Get changed files
+    // 2. Get PR changed files
     const { data: files } = await octokit.rest.pulls.listFiles({
       owner,
       repo,
@@ -452,6 +390,7 @@ async function handlePullRequest(payload: any) {
       .slice(0, MAX_FILES_PER_PR);
 
     if (codeFiles.length === 0) {
+      // No code files — mark check as passed
       await octokit.rest.checks.update({
         owner,
         repo,
@@ -467,7 +406,7 @@ async function handlePullRequest(payload: any) {
       return;
     }
 
-    // 4. Fetch and analyze files sequentially
+    // 4. Fetch file contents and analyze sequentially to avoid Groq 12k TPM rate limits
     const results: Array<{
       file: string;
       score: number;
@@ -475,12 +414,15 @@ async function handlePullRequest(payload: any) {
       issues: FileIssue[];
       cyclomaticComplexity: number | null;
       cognitiveComplexity: number | null;
-      wasTruncated: boolean;
     }> = [];
 
+    // Process sequentially (1 file at a time) and add a short delay
     for (const file of codeFiles) {
       let rValue: any;
       try {
+        // NOTE: Use owner/repo instead of headOwner/headRepo. 
+        // GitHub allows fetching PR commits (ref: headSha) from the base repository.
+        // This is required to support PRs from forks!
         const { data: contentData } = await octokit.rest.repos.getContent({
           owner,
           repo,
@@ -488,20 +430,15 @@ async function handlePullRequest(payload: any) {
           ref: headSha,
         });
 
-        // getContent returns base64-encoded content for files
-        const rawContent =
-          'content' in contentData
-            ? Buffer.from(contentData.content as string, 'base64').toString('utf-8')
-            : '';
+        // getContent returns base64 encoded for files
+        const content = 'content' in contentData
+          ? Buffer.from(contentData.content as string, 'base64').toString('utf-8')
+          : '';
 
-        if (!rawContent) {
-          rValue = { file: file.filename, skipped: true, error: 'File text empty' };
-        } else if (rawContent.length > 500_000) {
-          // Hard cap: files over 500 KB are binary or generated — skip entirely
-          rValue = { file: file.filename, skipped: true, error: 'File too large (>500 KB), skipped' };
+        if (!content || content.length > 100000) {
+          rValue = { file: file.filename, skipped: true, error: !content ? 'File text empty' : 'File too large (>100KB)' };
         } else {
-          // analyzeFile handles truncation internally
-          const result = await analyzeFile(file.filename, rawContent);
+          const result = await analyzeFile(file.filename, content);
           rValue = { file: file.filename, ...result };
         }
       } catch (err: any) {
@@ -514,7 +451,6 @@ async function handlePullRequest(payload: any) {
           file: rValue.file as string,
           score: 50,
           scoreBreakdown: null,
-          wasTruncated: false,
           issues: [{
             file: rValue.file as string,
             line: 1,
@@ -523,27 +459,27 @@ async function handlePullRequest(payload: any) {
             message: `Failed to analyze code: ${rValue.error}`,
           }],
           cyclomaticComplexity: null,
-          cognitiveComplexity: null,
+          cognitiveComplexity: null
         });
       } else {
         results.push(rValue as any);
       }
 
-      // Small delay between files to avoid hitting per-minute limits
-      await new Promise((res) => setTimeout(res, 2000));
+      // Small delay between files to refill tokens on Groq free tier
+      await new Promise(res => setTimeout(res, 2000));
     }
 
     // 5. Calculate overall score
-    const overallScore =
-      results.length > 0
-        ? Math.round(results.reduce((sum, r) => sum + r.score, 0) / results.length)
-        : 100;
+    const overallScore = results.length > 0
+      ? Math.round(results.reduce((sum, r) => sum + r.score, 0) / results.length)
+      : 100;
 
     const passed = overallScore >= SCORE_THRESHOLD;
 
-    // 6. Post or update PR comment
+    // 6. Post or update PR comment (upsert to prevent duplicates)
     const commentBody = buildPRComment(results, overallScore, passed, headSha);
     if (existingBotComment) {
+      // Update existing comment instead of creating a new one
       await octokit.rest.issues.updateComment({
         owner,
         repo,
@@ -584,6 +520,7 @@ async function handlePullRequest(payload: any) {
 // ---------- Route ----------
 
 export const githubWebhookRoute: FastifyPluginAsync = async (app) => {
+  // Disable automatic JSON parsing for this route so we can verify the signature
   app.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body, done) => {
     done(null, body);
   });
@@ -593,6 +530,7 @@ export const githubWebhookRoute: FastifyPluginAsync = async (app) => {
     const signature = req.headers['x-hub-signature-256'] as string | undefined;
     const event = req.headers['x-github-event'] as string | undefined;
 
+    // Verify webhook signature
     if (!verifyWebhookSignature(rawBody, signature)) {
       return reply.status(401).send({ error: 'Invalid webhook signature' });
     }
@@ -602,26 +540,22 @@ export const githubWebhookRoute: FastifyPluginAsync = async (app) => {
     switch (event) {
       case 'installation': {
         if (payload.action === 'created') {
-          await db
-            .insert(githubInstallations)
-            .values({
-              installationId: payload.installation.id,
+          await db.insert(githubInstallations).values({
+            installationId: payload.installation.id,
+            accountLogin: payload.installation.account.login,
+            accountType: payload.installation.account.type,
+            repositorySelection: payload.installation.repository_selection,
+          }).onConflictDoUpdate({
+            target: githubInstallations.installationId,
+            set: {
               accountLogin: payload.installation.account.login,
-              accountType: payload.installation.account.type,
               repositorySelection: payload.installation.repository_selection,
-            })
-            .onConflictDoUpdate({
-              target: githubInstallations.installationId,
-              set: {
-                accountLogin: payload.installation.account.login,
-                repositorySelection: payload.installation.repository_selection,
-                updatedAt: new Date(),
-              },
-            });
+              updatedAt: new Date(),
+            },
+          });
           console.log(`[GitHub] Installation created: ${payload.installation.account.login}`);
         } else if (payload.action === 'deleted') {
-          await db
-            .delete(githubInstallations)
+          await db.delete(githubInstallations)
             .where(eq(githubInstallations.installationId, payload.installation.id));
           console.log(`[GitHub] Installation deleted: ${payload.installation.account.login}`);
         }
@@ -629,6 +563,7 @@ export const githubWebhookRoute: FastifyPluginAsync = async (app) => {
       }
 
       case 'pull_request': {
+        // Run PR analysis in background (don't block the webhook response)
         handlePullRequest(payload).catch((err) => {
           console.error('[GitHub] Background PR analysis error:', err);
         });

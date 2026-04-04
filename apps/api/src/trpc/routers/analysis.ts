@@ -190,14 +190,17 @@ export const analysisRouter = t.router({
         .select({
           id: issues.id,
           line: issues.line,
+          endLine: issues.endLine,
           column: issues.col,
           severity: issues.severity,
           category: issues.category,
           message: issues.message,
+          suggestion: issues.suggestion,
           rule: issues.rule,
           fixable: issues.fixable,
           metadata: issues.metadata,
           fix: fixes.fixedCode,
+          originalCode: fixes.originalCode,
         })
         .from(issues)
         .leftJoin(fixes, eq(fixes.issueId, issues.id))

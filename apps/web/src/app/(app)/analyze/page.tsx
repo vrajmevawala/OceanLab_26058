@@ -106,12 +106,15 @@ export default function AnalyzePage() {
           issues: (detail.issues || []).map((i: any) => ({
             id: i.id,
             line: i.line,
+            endLine: i.endLine ?? i.line,
             column: i.column || i.col || 0,
             severity: i.severity,
             message: i.message,
             rule: i.rule,
             fixable: i.fixable,
             fix: i.fix,
+            originalCode: i.originalCode,
+            explanation: i.suggestion || i.explanation,
             metadata: i.metadata,
           })),
           fixedCount: (detail.issues || []).filter((i: any) => i.fixable).length,
@@ -242,12 +245,15 @@ export default function AnalyzePage() {
           issues: (result.issues || []).map((i: any) => ({
             id: i.id,
             line: i.line,
+            endLine: i.endLine ?? i.line,
             column: i.column || i.col || 0,
             severity: i.severity,
             message: i.message,
             rule: i.rule,
             fixable: i.fixable,
             fix: i.fix,
+            originalCode: i.originalCode,
+            explanation: i.suggestion || i.explanation,
             metadata: i.metadata,
           })),
           fixedCount: (result.issues || []).filter((i: any) => i.fixable).length,
@@ -266,14 +272,45 @@ export default function AnalyzePage() {
     if (!issue || !issue.fix) return;
 
     const lines = activeTab.code.split('\n');
-    // Simple line-based replacement.
-    // In a more advanced version, we could use the 'col' and 'endLine/endCol'
-    if (issue.line > 0 && issue.line <= lines.length) {
-      lines[issue.line - 1] = issue.fix;
+    const startLine = issue.line;
+    const endLine = issue.endLine ?? issue.line;
+
+    if (startLine > 0 && startLine <= lines.length) {
+      // Replace the entire unoptimized range (startLine..endLine) with the optimized fix
+      const fixLines = issue.fix.split('\n');
+      const clampedEnd = Math.min(endLine, lines.length);
+      lines.splice(startLine - 1, clampedEnd - startLine + 1, ...fixLines);
       const updatedCode = lines.join('\n');
       handleCodeChange(updatedCode);
-      // Optional: clear the issue after applying? 
-      // For now, let's keep it but maybe mark it as applied if we added a field.
+
+      // Remove the applied issue from the list and adjust line numbers for subsequent issues
+      const linesRemoved = clampedEnd - startLine + 1;
+      const linesAdded = fixLines.length;
+      const lineDelta = linesAdded - linesRemoved;
+
+      setTabs(prev => prev.map(t => {
+        if (t.id !== activeTabId) return t;
+        const updatedIssues = (t.issues || [])
+          .filter(i => i.id !== issueId)
+          .map(i => {
+            if (i.line > clampedEnd) {
+              return {
+                ...i,
+                line: i.line + lineDelta,
+                endLine: i.endLine ? i.endLine + lineDelta : undefined,
+              };
+            }
+            return i;
+          });
+        return {
+          ...t,
+          issues: updatedIssues,
+          fixedCount: (t.fixedCount || 0) + 1,
+        };
+      }));
+
+      // Clear active issue selection after applying
+      setActiveIssueId(undefined);
     }
   };
 

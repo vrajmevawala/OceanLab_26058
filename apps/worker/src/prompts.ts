@@ -64,7 +64,8 @@ OUTPUT RULES:
 - PRIORITIZE: List the most critical issues first within the 'issues' array.
 - SUMMARY: The 'complete_analysis' tool call is required to finalize the analysis.
 - SOLUTION VARIATIONS: Always provide Naive, Optimized, and (if possible) In-place solutions for the bottlenecks identified.
-- Be precise with line numbers.
+- Be precise with line numbers. For each issue, provide both 'line' (starting line) and 'endLine' (ending line) to encompass the full problematic section.
+- The 'fix' you provide should be a complete, direct replacement for the entire identified range.
 - Provide a "suggestion" explaining the better pattern and why it's faster/cleaner.
 `.trim();
 }

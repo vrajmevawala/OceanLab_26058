@@ -19,14 +19,19 @@ export function DiffView({ code, issues }: DiffViewProps) {
   let currentLine = 1;
 
   fixableIssues.forEach(issue => {
+    const endLine = issue.endLine ?? issue.line;
+    const clampedEnd = Math.min(endLine, lines.length);
+
     // Add context lines before the issue
     while (currentLine < issue.line) {
       diffLines.push({ type: 'context', lineNum: currentLine, content: lines[currentLine - 1] });
       currentLine++;
     }
 
-    // Add the removed original line
-    diffLines.push({ type: 'remove', lineNum: currentLine, content: lines[currentLine - 1] });
+    // Add the removed original lines (entire range)
+    for (let ln = issue.line; ln <= clampedEnd; ln++) {
+      diffLines.push({ type: 'remove', lineNum: ln, content: lines[ln - 1] });
+    }
 
     // Add the added fixed lines
     const fixLines = issue.fix?.split('\n') || [];
@@ -34,7 +39,7 @@ export function DiffView({ code, issues }: DiffViewProps) {
       diffLines.push({ type: 'add', content: fLine });
     });
 
-    currentLine++;
+    currentLine = clampedEnd + 1;
   });
 
   // Add remaining context lines after the last issue

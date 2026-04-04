@@ -75,8 +75,9 @@ export function CodeEditor({
 
     // Add issues decorations
     issues.forEach(issue => {
+      const endLine = issue.endLine ?? issue.line;
       newDecorations.push({
-        range: new monaco.Range(issue.line, 1, issue.line, 1),
+        range: new monaco.Range(issue.line, 1, endLine, 1),
         options: {
           isWholeLine: true,
           className: `line-issue-${issue.severity}`,

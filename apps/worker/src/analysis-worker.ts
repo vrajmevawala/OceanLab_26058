@@ -22,9 +22,10 @@ const groq = new Groq({ apiKey: process.env.GROQ_API_KEY ?? '' });
 
 type ReportedIssue = {
   line: number;
+  endLine?: number;
   col?: number;
   severity: 'error' | 'warning' | 'info';
-  category: 'security' | 'performance' | 'complexity' | 'style' | 'best-practice' | 'bug';
+  category: string; // Accept any category from LLM, normalize later
   rule: string;
   message: string;
   suggestion?: string;
@@ -35,6 +36,76 @@ type ReportedIssue = {
     spaceComplexity?: string;
   };
 };
+
+// Valid DB categories
+const VALID_DB_CATEGORIES = ['security', 'performance', 'complexity', 'style', 'best-practice', 'bug'] as const;
+type DbCategory = typeof VALID_DB_CATEGORIES[number];
+
+// Map LLM-generated categories to valid DB categories
+const CATEGORY_MAP: Record<string, DbCategory> = {
+  // Direct matches
+  security: 'security',
+  performance: 'performance',
+  complexity: 'complexity',
+  style: 'style',
+  'best-practice': 'best-practice',
+  bug: 'bug',
+  // Syntax / compilation → bug
+  syntax: 'bug',
+  'syntax-error': 'bug',
+  compilation: 'bug',
+  'compile-error': 'bug',
+  error: 'bug',
+  'type-error': 'bug',
+  'type-safety': 'bug',
+  'runtime-error': 'bug',
+  logic: 'bug',
+  // Memory → performance
+  memory: 'performance',
+  'memory-leak': 'performance',
+  optimization: 'performance',
+  efficiency: 'performance',
+  // Redundancy / readability → style
+  redundancy: 'style',
+  readability: 'style',
+  naming: 'style',
+  formatting: 'style',
+  convention: 'style',
+  'code-smell': 'style',
+  // Misc
+  maintainability: 'complexity',
+  refactoring: 'complexity',
+  'dead-code': 'style',
+};
+
+// Categories that should always be treated as errors
+const ERROR_CATEGORIES = new Set(['syntax', 'syntax-error', 'compilation', 'compile-error', 'type-error', 'runtime-error']);
+
+function normalizeCategory(category: string): DbCategory {
+  const lower = category.toLowerCase().trim();
+  return CATEGORY_MAP[lower] ?? 'bug'; // Default unmapped categories to 'bug'
+}
+
+function normalizeSeverity(severity: string, category: string): 'error' | 'warning' | 'info' {
+  const lowerCat = category.toLowerCase().trim();
+  // Syntax and compilation issues are always errors
+  if (ERROR_CATEGORIES.has(lowerCat)) {
+    return 'error';
+  }
+  
+  // As requested, ONLY syntax/compilation issues can be errors.
+  // If the LLM returned 'error' for anything else, downgrade it to 'warning'.
+  if (severity === 'error') {
+    return 'warning';
+  }
+  
+  // Keep the LLM's severity if it's warning or info
+  if (severity === 'warning' || severity === 'info') {
+    return severity;
+  }
+  
+  return 'warning'; // Default to warning
+}
 
 const COMPLETE_ANALYSIS_TOOL = {
   type: 'function' as const,
@@ -50,11 +121,19 @@ const COMPLETE_ANALYSIS_TOOL = {
             type: 'object',
             properties: {
               line: { type: 'number' },
+              endLine: { type: 'number', description: 'The line number where the unoptimized section ends' },
               col: { type: 'number' },
               severity: { type: 'string', enum: ['error', 'warning', 'info'] },
               category: {
                 type: 'string',
-                enum: ['security', 'performance', 'complexity', 'style', 'best-practice', 'bug'],
+                enum: [
+                  'security', 'performance', 'complexity', 'style', 'best-practice', 'bug',
+                  'syntax', 'syntax-error', 'compilation', 'compile-error', 'error',
+                  'memory', 'memory-leak', 'optimization', 'efficiency',
+                  'redundancy', 'readability', 'naming', 'formatting', 'convention', 'code-smell',
+                  'logic', 'type-error', 'type-safety', 'runtime-error',
+                  'maintainability', 'refactoring', 'dead-code',
+                ],
               },
               rule: { type: 'string' },
               message: { type: 'string' },
@@ -129,33 +208,50 @@ export const analysisWorker = new Worker(
         complexityScore: args.overallComplexityScore,
       };
 
+      // Normalize severities and categories first
+      const normalizedIssues = reportedIssues.map(issue => ({
+        ...issue,
+        severity: normalizeSeverity(issue.severity, issue.category),
+        category: normalizeCategory(issue.category),
+      }));
+
       const lineCount = code.split('\n').length;
       const densityFactor = Math.max(1, lineCount / 100);
-      const rawDeductions = (
-        reportedIssues.filter((i) => i.severity === 'error').length * 12 +
-        reportedIssues.filter((i) => i.severity === 'warning').length * 5 +
-        reportedIssues.filter((i) => i.severity === 'info').length
-      );
+      
+      const errorCount = normalizedIssues.filter((i) => i.severity === 'error').length;
+      const warningCount = normalizedIssues.filter((i) => i.severity === 'warning').length;
+      const infoCount = normalizedIssues.filter((i) => i.severity === 'info').length;
 
-      const score = Math.max(0, Math.round(100 - (rawDeductions / densityFactor)));
+      const rawDeductions = (errorCount * 12 + warningCount * 5 + infoCount);
+      let score = Math.max(0, Math.round(100 - (rawDeductions / densityFactor)));
+
+      if (errorCount > 0) {
+        score = 0;
+      }
 
       let insertedIssueRows: Array<{ id: string; message: string }> = [];
-      if (reportedIssues.length > 0) {
-        const issueValues = await Promise.all(reportedIssues.map(async (issue) => {
+      if (normalizedIssues.length > 0) {
+        const issueValues = await Promise.all(normalizedIssues.map(async (issue) => {
           // Coordinate Snapping Pass (Optional)
           const snapped = await snapToNode(code, issue.line, issue.col ?? 0);
           
+          const startLine = snapped?.line ?? issue.line;
+          const endLine = snapped?.endLine ?? (issue.endLine && issue.endLine >= issue.line ? issue.endLine : (snapped?.line ?? issue.line));
+          
+          const codeLines = code.split('\n');
+          const originalCodeSnippet = codeLines.slice(startLine - 1, endLine).join('\n');
+
           return {
             analysisId,
-            line: snapped?.line ?? issue.line,
+            line: startLine,
             col: snapped?.col ?? issue.col ?? 0,
-            endLine: snapped?.endLine ?? snapped?.line ?? issue.line,
+            endLine: endLine,
             severity: issue.severity,
             category: issue.category,
             rule: issue.rule,
             message: issue.message,
             suggestion: issue.suggestion,
-            codeSnippet: issue.codeSnippet || code.split('\n')[(snapped?.line ?? issue.line) - 1] || '',
+            codeSnippet: originalCodeSnippet || codeLines[startLine - 1] || '',
             fixable: issue.fixable ?? false,
             metadata: (issue.metricsImpact?.timeComplexity || issue.metricsImpact?.spaceComplexity) 
               ? { timeComplexity: issue.metricsImpact.timeComplexity, spaceComplexity: issue.metricsImpact.spaceComplexity } 
@@ -168,13 +264,14 @@ export const analysisWorker = new Worker(
           .values(issueValues)
           .returning({ id: issues.id, message: issues.message });
 
-        const fixable = reportedIssues.filter((i) => i.fixable);
-        const fixPromises = fixable.map(async (fixableIssue) => {
+        const fixable = normalizedIssues.filter((i) => i.fixable);
+        for (const fixableIssue of fixable) {
           const issueRow = insertedIssueRows.find((r) => r.message === fixableIssue.message);
-          if (!issueRow) return;
+          if (!issueRow) continue;
 
+          console.log(`[Worker] Generating fix for issue at line ${fixableIssue.line}`);
           const fixResp = await groq.chat.completions.create({
-            model: 'llama-3.3-70b-versatile',
+            model: 'llama-3.1-8b-instant',
             messages: [
               {
                 role: 'user',
@@ -199,9 +296,10 @@ export const analysisWorker = new Worker(
               confidenceScore: 90,
             });
           }
-        });
-
-        await Promise.all(fixPromises);
+          
+          // Small delay between fix requests to refill TPM on Groq
+          await new Promise(res => setTimeout(res, 1000));
+        }
       }
 
       await db
@@ -240,5 +338,5 @@ export const analysisWorker = new Worker(
       throw err;
     }
   },
-  { connection, concurrency: 5 },
+  { connection, concurrency: 1 },
 );
