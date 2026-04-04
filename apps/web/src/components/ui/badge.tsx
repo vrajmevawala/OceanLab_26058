@@ -2,7 +2,7 @@
 import React from 'react';
 import { clsx } from 'clsx';
 
-type BadgeVariant = 'green' | 'red' | 'yellow' | 'info' | 'accent' | 'dim' | 'ghost';
+type BadgeVariant = 'green' | 'red' | 'yellow' | 'info' | 'accent' | 'dim' | 'ghost' | 'outline';
 
 interface BadgeProps {
   children: React.ReactNode;
@@ -19,6 +19,7 @@ const styles: Record<BadgeVariant, React.CSSProperties> = {
   accent: { background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid rgba(240, 136, 62, 0.15)' },
   dim:    { background: 'var(--surface-2)',  color: 'var(--text-mid)', border: '1px solid var(--border)' },
   ghost:  { background: 'transparent',      color: 'var(--text-mid)', border: 'none' },
+  outline: { background: 'transparent',      color: 'var(--text-mid)', border: '1px solid var(--border)' },
 };
 
 export function Badge({ children, variant = 'dim', size = 'md', className }: BadgeProps) {

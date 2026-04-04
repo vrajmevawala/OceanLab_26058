@@ -207,10 +207,10 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
-      
-      <StatusBar 
-        file="Dashboard" 
-        language="System" 
+
+      <StatusBar
+        file="Dashboard"
+        language="System"
         issueCount={stats.totalIssues}
       />
     </div>

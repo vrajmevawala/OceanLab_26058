@@ -13,3 +13,4 @@ export * from './tooltip';
 export * from './segment-control';
 export * from './icons';
 export * from './textarea';
+export * from './card-split-accordion';

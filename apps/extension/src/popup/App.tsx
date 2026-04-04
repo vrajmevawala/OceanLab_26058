@@ -202,13 +202,34 @@ export default function App() {
                 <h3 style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-dim)', textTransform: 'uppercase' }}>Detected Issues ({results.issues.length})</h3>
                 {results.issues.map((issue: any, i: number) => (
                   <div key={i} className="issue-item">
-                    <div style={{ marginTop: 2 }}>
-                      {issue.severity === 'error' ? <AlertTriangle size={16} color="var(--red)" /> : <Info size={16} color="var(--yellow)" />}
+                    <div style={{ display: 'flex', gap: 12 }}>
+                      <div style={{ marginTop: 2 }}>
+                        {issue.severity === 'error' ? <AlertTriangle size={16} color="var(--red)" /> : <Info size={16} color="var(--yellow)" />}
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600 }}>Ln {issue.line}: {issue.message}</div>
+                        <p style={{ fontSize: 12, color: 'var(--text-mid)', margin: 0, lineHeight: 1.4 }}>{issue.suggestion}</p>
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600 }}>Ln {issue.line}: {issue.message}</div>
-                      <p style={{ fontSize: 12, color: 'var(--text-mid)', margin: 0, lineHeight: 1.4 }}>{issue.suggestion}</p>
-                    </div>
+
+                    {issue.fix && (
+                      <div className="code-fix-container">
+                        <div className="code-fix-header">
+                          <span>Correct Code</span>
+                          <button 
+                            className="copy-button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(issue.fix);
+                              // Simple temporary feedback could be added here
+                            }}
+                          >
+                            <Copy size={12} />
+                            Copy
+                          </button>
+                        </div>
+                        <pre className="code-fix-content">{issue.fix}</pre>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

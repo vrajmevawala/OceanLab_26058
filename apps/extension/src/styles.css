@@ -95,6 +95,58 @@ body {
   border-radius: 10px;
   padding: 12px;
   display: flex;
-  gap: 12px;
+  flex-direction: column;
+  gap: 10px;
   margin-bottom: 12px;
+}
+
+.code-fix-container {
+  background: #0d1117;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.code-fix-header {
+  background: rgba(255,255,255,0.03);
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--text-dim);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.code-fix-content {
+  padding: 12px;
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--green);
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.copy-button {
+  background: transparent;
+  border: none;
+  color: var(--text-mid);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s;
+}
+
+.copy-button:hover {
+  background: var(--surface-3);
+  color: var(--text);
 }

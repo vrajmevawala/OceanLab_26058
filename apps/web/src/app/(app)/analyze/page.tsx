@@ -86,7 +86,7 @@ export default function AnalyzePage() {
         const targetId = searchParams.get('id');
         const shouldOpenChat = searchParams.get('chat') === 'true';
 
-        const list = await api.trpcQuery<{ items: any[] }>('analysis.list', { page: 1, pageSize: 10 });
+        const list = await api.trpcQuery<{ items: any[] }>('analysis.list', { page: 1, pageSize: 5 });
         const items = list.items || [];
         
         const mapToTab = (detail: any): Tab => {
@@ -404,7 +404,7 @@ export default function AnalyzePage() {
               onChange={handleCodeChange}
               onCursorChange={(line, col) => setCursorPos({ line, col })}
               issues={activeTab.issues}
-              highlightLine={activeIssue?.line}
+              highlightRange={activeIssue ? { line: activeIssue.line, endLine: activeIssue.endLine } : undefined}
               onLineClick={(line) => {
                 const issue = activeTab.issues?.find(i => i.line === line);
                 if (issue) setActiveIssueId(issue.id);

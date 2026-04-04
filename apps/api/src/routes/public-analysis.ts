@@ -37,8 +37,9 @@ const REPORT_ISSUE_TOOL = {
         suggestion: { type: 'string' },
         codeSnippet: { type: 'string' },
         fixable: { type: 'boolean' },
+        fix: { type: 'string', description: 'The complete optimized code block to replace the unoptimized section' },
       },
-      required: ['line', 'severity', 'category', 'rule', 'message'],
+      required: ['line', 'severity', 'category', 'rule', 'message', 'fix'],
     },
   },
 };
@@ -74,7 +75,7 @@ export const publicAnalysisRoute: FastifyPluginAsync = async (app) => {
           },
           { 
             role: 'user', 
-            content: buildAnalysisUserPrompt(language, code, astContext) 
+            content: `${buildAnalysisUserPrompt(language, code, astContext)}\n\nIMPORTANT: For every issue identified, you MUST provide the complete optimized code fix in the 'fix' field of the tool call. The 'suggestion' field should only contain a brief explanation.` 
           }
         ],
         tools: [REPORT_ISSUE_TOOL],

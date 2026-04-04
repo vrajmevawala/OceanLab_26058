@@ -120,8 +120,8 @@ const COMPLETE_ANALYSIS_TOOL = {
           items: {
             type: 'object',
             properties: {
-              line: { type: 'number' },
-              endLine: { type: 'number', description: 'The line number where the unoptimized section ends' },
+              line: { type: 'number', description: 'The starting line number of the unoptimized or problematic section' },
+              endLine: { type: 'number', description: 'The ending line number of the unoptimized section (must encompass the entire block)' },
               col: { type: 'number' },
               severity: { type: 'string', enum: ['error', 'warning', 'info'] },
               category: {
@@ -236,7 +236,12 @@ export const analysisWorker = new Worker(
           const snapped = await snapToNode(code, issue.line, issue.col ?? 0);
           
           const startLine = snapped?.line ?? issue.line;
-          const endLine = snapped?.endLine ?? (issue.endLine && issue.endLine >= issue.line ? issue.endLine : (snapped?.line ?? issue.line));
+          // Prioritize the LLM's endLine if it's valid, but ensure it's at least the startLine.
+          // If snapToNode found a larger encompassing node, use that.
+          let endLine = (issue.endLine && issue.endLine >= issue.line) ? issue.endLine : startLine;
+          if (snapped && snapped.endLine > endLine) {
+            endLine = snapped.endLine;
+          }
           
           const codeLines = code.split('\n');
           const originalCodeSnippet = codeLines.slice(startLine - 1, endLine).join('\n');

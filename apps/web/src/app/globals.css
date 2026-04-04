@@ -188,6 +188,17 @@ code, pre { font-family: var(--font-mono); }
   font-size: 0.9em;
 }
 
-/* Chatbot Drag Cursors */
-.cursor-grab { cursor: grab; }
-.cursor-grabbing { cursor: grabbing; }
+
+/* ─── Landing Page ─── */
+.nav-link {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-mid);
+  transition: color 0.15s ease, transform 0.15s ease;
+  text-decoration: none;
+}
+
+.nav-link:hover {
+  color: var(--text);
+}
+

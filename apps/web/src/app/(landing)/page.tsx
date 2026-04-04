@@ -5,21 +5,26 @@ import Link from 'next/link';
 import { HeroTerminal } from '@/components/landing/hero-terminal';
 import { FeatureCarousel } from '@/components/landing/feature-carousel';
 import { PricingGrid } from '@/components/landing/pricing-grid';
+import { FAQSection } from '@/components/landing/faq-section';
 import { StatusBar } from '@/components/layout/status-bar';
 import { Zap, ArrowRight } from 'lucide-react';
 import { GithubIcon } from '@/components/ui/icons';
 
 const STATS = [
   { value: '2.4M+', label: 'Issues Fixed' },
-  { value: '48K+',  label: 'Developers' },
-  { value: '94',    label: 'Avg Score' },
+  { value: '48K+', label: 'Developers' },
+  { value: '94', label: 'Avg Score' },
 ];
 
-const NAV_LINKS = ['Features', 'Pricing', 'Docs', 'Blog'];
+const NAV_LINKS = [
+  { label: 'Features', href: '/features' },
+  { label: 'Pricing', href: '#pricing' },
+  { label: 'FAQ', href: '#faq' },
+];
 
 export default function LandingPage() {
   return (
-    <div style={{ height: '100vh', overflowY: 'auto', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ height: '100vh', overflowY: 'auto', background: 'var(--bg)', display: 'flex', flexDirection: 'column', scrollBehavior: 'smooth' }}>
       {/* Sticky header */}
       <header style={{
         position: 'sticky', top: 0, zIndex: 100,
@@ -27,7 +32,7 @@ export default function LandingPage() {
         backdropFilter: 'blur(12px)',
         borderBottom: '1px solid var(--border)',
         display: 'flex', alignItems: 'center',
-        padding: '0 40px', height: 52,
+        padding: '0 48px', height: 72,
         gap: 32,
       }}>
         {/* Logo */}
@@ -35,14 +40,14 @@ export default function LandingPage() {
           <div style={{ width: 26, height: 26, borderRadius: 6, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Zap size={13} color="#0d1117" fill="#0d1117" />
           </div>
-          <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>CodeSage</span>
+          <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>CodeSage</span>
         </div>
 
         {/* Nav */}
-        <nav style={{ display: 'flex', gap: 24, flex: 1 }}>
-          <Link href="/playground" style={{ fontSize: 13, color: 'var(--text-mid)', transition: 'color 0.15s', textDecoration: 'none' }}>Playground</Link>
+        <nav style={{ display: 'flex', gap: 32, flex: 1, marginLeft: 12 }}>
+          <Link href="/playground" className="nav-link">Playground</Link>
           {NAV_LINKS.map(l => (
-            <a key={l} href="#" style={{ fontSize: 13, color: 'var(--text-mid)', transition: 'color 0.15s' }}>{l}</a>
+            <a key={l.label} href={l.href} className="nav-link">{l.label}</a>
           ))}
         </nav>
 
@@ -154,7 +159,7 @@ export default function LandingPage() {
         <HeroTerminal />
       </div>
 
-      <div style={{ padding: '48px 80px', maxWidth: 1200, margin: '0 auto', width: '100%' }}>
+      <div id="features" style={{ padding: '96px 80px', maxWidth: 1200, margin: '0 auto', width: '100%' }}>
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
           <h2 style={{ fontSize: 28, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>Everything you need to ship better code</h2>
           <p style={{ fontSize: 14, color: 'var(--text-mid)' }}>Six powerful modules. One platform.</p>
@@ -162,13 +167,15 @@ export default function LandingPage() {
         <FeatureCarousel />
       </div>
 
-      <div style={{ padding: '48px 80px', maxWidth: 1200, margin: '0 auto', width: '100%' }}>
+      <div id="pricing" style={{ padding: '96px 80px', maxWidth: 1200, margin: '0 auto', width: '100%' }}>
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
           <h2 style={{ fontSize: 28, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>Simple, transparent pricing</h2>
           <p style={{ fontSize: 14, color: 'var(--text-mid)' }}>Start free. Scale as you grow.</p>
         </div>
-        <PricingGrid onGetStarted={() => {}} />
+        <PricingGrid onGetStarted={() => { }} />
       </div>
+
+      <FAQSection />
 
       <div style={{ marginTop: 'auto' }}>
         <StatusBar file="landing.tsx" language="TypeScript" issueCount={0} />

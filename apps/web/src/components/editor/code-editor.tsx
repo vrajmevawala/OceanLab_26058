@@ -7,7 +7,7 @@ interface CodeEditorProps {
   code: string;
   language?: string;
   readOnly?: boolean;
-  highlightLine?: number;
+  highlightRange?: { line: number, endLine?: number };
   issues?: Issue[];
   onLineClick?: (line: number) => void;
   onChange?: (value: string | undefined) => void;
@@ -18,7 +18,7 @@ export function CodeEditor({
   code, 
   language = 'typescript', 
   readOnly = false,
-  highlightLine, 
+  highlightRange, 
   issues = [], 
   onLineClick,
   onChange,
@@ -90,10 +90,11 @@ export function CodeEditor({
     });
 
     // Add active highlight decoration
-    if (highlightLine !== undefined) {
-      editorRef.current.revealLineInCenter(highlightLine);
+    if (highlightRange !== undefined) {
+      const { line, endLine = line } = highlightRange;
+      editorRef.current.revealLineInCenter(line);
       newDecorations.push({
-        range: new monaco.Range(highlightLine, 1, highlightLine, 1),
+        range: new monaco.Range(line, 1, endLine, 1),
         options: {
           isWholeLine: true,
           className: 'line-highlight-accent',
@@ -102,7 +103,7 @@ export function CodeEditor({
     }
 
     decorationsRef.current = editorRef.current.deltaDecorations(decorationsRef.current, newDecorations);
-  }, [issues, highlightLine]);
+  }, [issues, highlightRange]);
 
   return (
     <div style={{ flex: 1, width: '100%', height: '100%', position: 'relative' }}>
