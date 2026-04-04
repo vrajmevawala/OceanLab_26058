@@ -16,3 +16,12 @@ process.on('SIGINT', async () => {
   await analysisWorker.close();
   process.exit(0);
 });
+
+import { createServer } from 'http';
+const port = process.env.PORT || 3002;
+createServer((_req, res) => {
+  res.writeHead(200);
+  res.end('Worker is active\\n');
+}).listen(port, () => {
+  console.log(`Worker dummy server listening on port ${port}`);
+});
