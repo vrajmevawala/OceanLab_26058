@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "AI-powered code analysis and optimization directly in your browser.",
   "permissions": ["activeTab", "storage", "scripting"],
-  "host_permissions": ["http://localhost:3001/*"],
+  "host_permissions": ["*://*/*"],
   "action": {
     "default_popup": "index.html",
     "default_icon": {
