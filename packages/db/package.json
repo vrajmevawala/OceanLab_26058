@@ -5,8 +5,14 @@
   "type": "module",
   "main": "dist/index.js",
   "exports": {
-    ".": "./src/index.ts",
-    "./schema": "./src/schema/index.ts"
+    ".": {
+      "development": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./schema": {
+      "development": "./src/schema/index.ts",
+      "default": "./dist/schema/index.js"
+    }
   },
   "types": "dist/index.d.ts",
   "scripts": {

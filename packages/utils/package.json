@@ -5,8 +5,14 @@
   "type": "module",
   "main": "dist/index.js",
   "exports": {
-    ".": "./src/index.ts",
-    "./ai": "./src/ai/index.ts"
+    ".": {
+      "development": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./ai": {
+      "development": "./src/ai/index.ts",
+      "default": "./dist/ai/index.js"
+    }
   },
   "types": "dist/index.d.ts",
   "scripts": {
