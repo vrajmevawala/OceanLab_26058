@@ -26,8 +26,10 @@ export async function buildServer() {
   await app.register(helmet, { contentSecurityPolicy: false });
   await app.register(cors, {
     origin: [
-      process.env.WEB_URL ?? 'http://localhost:3000', 
+      process.env.WEB_URL ?? 'http://localhost:3000',
       'https://codeopt.dev',
+      'https://codesage-web.onrender.com',
+      /^https:\/\/.*\.onrender\.com$/,
       /^chrome-extension:\/\//, // Allow browser extension
     ],
     credentials: true,
