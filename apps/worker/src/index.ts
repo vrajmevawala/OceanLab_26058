@@ -1,6 +1,6 @@
 import './env.js';
 import { analysisWorker } from './analysis-worker.js';
-
+console.log("🚀 SERVER STARTED");
 analysisWorker.on('ready', () => {
   console.log('Analysis worker ready');
 });

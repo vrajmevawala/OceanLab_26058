@@ -224,6 +224,9 @@ export default function AnalyzePage() {
       // Update tab status to processing in-place
       setTabs(prev => prev.map(t => t.id === targetTabId ? { ...t, status: 'processing', isDraft: false } : t));
 
+      // Simulate a 4.5 second delay before fetching results to allow the fast animation to run
+      await new Promise(r => setTimeout(r, 4500));
+
       let result;
       for (let i = 0; i < 20; i++) {
         await new Promise(r => setTimeout(r, 2000));
@@ -388,7 +391,7 @@ export default function AnalyzePage() {
               border: 'none'
             }}
           >
-            {activeTab?.status === 'processing' ? <Loader2 size={12} className="animate-spin-smooth" /> : <Play size={10} fill="currentColor" />}
+            {activeTab?.status === 'processing' ? <Loader2 size={12} className="animate-spin-fast" /> : <Play size={10} fill="currentColor" />}
             <span style={{ marginLeft: 6 }}>Analyze</span>
           </Button>
         </div>
@@ -421,7 +424,7 @@ export default function AnalyzePage() {
           {activeTab && !activeTab.isDraft ? (
             activeTab.status === 'processing' ? (
               <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13, height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-                <Loader2 size={24} className="animate-spin-smooth" style={{ color: 'var(--accent)' }} />
+                <Loader2 size={24} className="animate-spin-fast" style={{ color: 'var(--accent)' }} />
                 <span>Analyzing {activeTab.name}...</span>
               </div>
             ) : (

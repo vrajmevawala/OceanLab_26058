@@ -6,7 +6,8 @@
   "main": "dist/index.js",
   "exports": {
     ".": "./src/index.ts",
-    "./ai": "./src/ai/index.ts"
+    "./ai": "./src/ai/index.ts",
+    "./bootstrap": "./src/bootstrap.ts"
   },
   "types": "dist/index.d.ts",
   "scripts": {
@@ -15,7 +16,8 @@
   "dependencies": {
     "tree-sitter": "^0.22.4",
     "tree-sitter-cpp": "^0.22.3",
-    "tree-sitter-python": "^0.23.2"
+    "tree-sitter-python": "^0.23.2",
+    "dotenv": "^16.4.5"
   },
   "devDependencies": {
     "@types/node": "^20.11.24",

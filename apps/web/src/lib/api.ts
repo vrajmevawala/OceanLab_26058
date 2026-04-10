@@ -41,7 +41,7 @@ async function getToken(): Promise<string | null> {
 
   await waitForClerk();
   const clerk = (window as ClerkWindow).Clerk;
-  
+
   if (!clerk?.session) {
     // If not loaded yet, wait a bit more for session
     let attempts = 0;
@@ -67,7 +67,16 @@ function getWorkspaceId(): string | null {
     return null;
   }
 
-  return localStorage.getItem(WORKSPACE_KEY);
+  const id = localStorage.getItem(WORKSPACE_KEY);
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+  if (id && !uuidRegex.test(id)) {
+    console.warn(`[API] Invalid workspace ID in storage: ${id}. Clearing.`);
+    localStorage.removeItem(WORKSPACE_KEY);
+    return null;
+  }
+
+  return id;
 }
 
 function setWorkspaceId(workspaceId: string) {
@@ -127,9 +136,10 @@ async function trpcRequest(path: string, input?: unknown) {
 
 async function trpcQueryRequest(path: string, input?: unknown) {
   const token = await getToken();
+  console.log("TOKEN:", token);
   const workspaceId = getWorkspaceId();
   const serializedInput = encodeURIComponent(JSON.stringify(input ?? {}));
-
+  
   console.log(`[API] Query: ${path}`, { workspaceId });
   const response = await fetch(`${BASE_URL}/trpc/${path}?input=${serializedInput}`, {
     method: 'GET',

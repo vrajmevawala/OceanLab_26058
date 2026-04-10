@@ -14,7 +14,7 @@
     "@anthropic-ai/sdk": "^0.60.0",
     "@aws-sdk/client-s3": "^3.750.0",
     "@aws-sdk/s3-request-presigner": "^3.750.0",
-    "@clerk/backend": "^1.22.0",
+    "@clerk/backend": "^3.2.8",
     "@codeopt/db": "workspace:*",
     "@codeopt/utils": "workspace:*",
     "@fastify/cors": "^11.2.0",

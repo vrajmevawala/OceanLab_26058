@@ -8,18 +8,26 @@ import { insertAuditLog } from '../../lib/audit.js';
 
 export const workspaceRouter = t.router({
   list: protectedProcedure.query(async ({ ctx }) => {
-    return ctx.db
-      .select({
-        id: workspaces.id,
-        name: workspaces.name,
-        slug: workspaces.slug,
-        ownerId: workspaces.ownerId,
-        role: teamMembers.role,
-        status: teamMembers.status,
-      })
-      .from(teamMembers)
-      .innerJoin(workspaces, eq(workspaces.id, teamMembers.workspaceId))
-      .where(and(eq(teamMembers.userId, ctx.user!.id), eq(teamMembers.status, 'active')));
+    try {
+      return await ctx.db
+        .select({
+          id: workspaces.id,
+          name: workspaces.name,
+          slug: workspaces.slug,
+          ownerId: workspaces.ownerId,
+          role: teamMembers.role,
+          status: teamMembers.status,
+        })
+        .from(teamMembers)
+        .innerJoin(workspaces, eq(workspaces.id, teamMembers.workspaceId))
+        .where(and(eq(teamMembers.userId, ctx.user!.id), eq(teamMembers.status, 'active')));
+    } catch (error) {
+      console.error("[workspace.list] DB Error:", error);
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to fetch workspaces from database',
+      });
+    }
   }),
 
   create: protectedProcedure

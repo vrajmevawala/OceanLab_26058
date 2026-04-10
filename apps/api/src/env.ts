@@ -1,6 +1,5 @@
-import { config } from 'dotenv';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { bootstrap } from '@codeopt/utils/bootstrap';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-config({ path: resolve(__dirname, '../.env') });
+// Standard initialization for API
+// This loads environment variables and applies the DNS patch for Neon database
+bootstrap();

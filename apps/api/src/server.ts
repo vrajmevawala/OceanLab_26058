@@ -50,6 +50,9 @@ export async function buildServer() {
     trpcOptions: {
       router: appRouter,
       createContext,
+      onError({ error, path }: { error: any; path: any }) {
+        console.error(`[tRPC] Error on '${path}':`, error);
+      },
     },
   });
 
